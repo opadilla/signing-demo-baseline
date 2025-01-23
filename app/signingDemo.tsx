@@ -640,11 +640,6 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
           signingData: {
             signatureType: PSPDFKit.SignatureType.CAdES,
             padesLevel: PSPDFKit.PAdESLevel.b_lt,
-            signatureMetadata: {
-              signerName: "Nutrient Sign App",
-              signatureReason: "Digital Signature using Nutrient's DWS API.",
-              signatureLocation: "Planet Earth"
-            }
           }
         },
         {
@@ -655,6 +650,7 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
       console.log("Document signed successfully");
     } catch (error) {
       console.error('Error in signing process:', error);
+      console.error('Full error:', error.stack);
     } finally {
       setIsLoading(false);
     }
