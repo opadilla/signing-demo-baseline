@@ -414,48 +414,8 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
         if (PSPDFKit) {
           PSPDFKit.unload(container);
         }
-        const {
-          UI: { createBlock, Recipes, Interfaces, Core },
-        } = PSPDFKit;
         PSPDFKit.load({
           licenseKey: process.env.NEXT_PUBLIC_LICENSE_KEY as string,
-          // @ts-ignore
-          ui: {
-            [Interfaces.CreateSignature]: ({ props }: any) => {
-              return {
-                content: createBlock(
-                  Recipes.CreateSignature,
-                  props,
-                  ({ ui }: any) => {
-                    if (isCreateInitial) {
-                      ui.getBlockById("title").children = "Create Initial";
-                      ui.getBlockById("save-signature-checkbox")._props.label =
-                        "Save Initial";
-
-                      const textInput = ui.getBlockById("signature-text-input");
-                      textInput._props.placeholder = "Initial";
-                      textInput._props.label = "Intial here";
-                      textInput._props.clearLabel = "Clear initial";
-
-                      const freehand = ui.getBlockById("freehand-canvas");
-                      freehand._props.placeholder = "Intial here";
-                      freehand._props.clearLabel = "Clear initial";
-
-                      const fontselect = ui.getBlockById("font-selector");
-                      if (fontselect._props.items[0].label == "Signature") {
-                        fontselect._props.items = fontselect._props.items.map(
-                          (item: any) => {
-                            return { id: item.id, label: "Initial" };
-                          }
-                        );
-                      }
-                    }
-                    return ui.createComponent();
-                  }
-                ).createComponent(),
-              };
-            },
-          },
           container,
           document: pdfUrl,
           baseUrl: `${window.location.protocol}//${window.location.host}/`,
@@ -474,38 +434,10 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
           styleSheets: [`/viewer.css`],
           isEditableAnnotation: function (annotation:any) {
             return !annotation.isSignature;
-          },
-          trustedCAsCallback: async () => {
-            let arrayBuffer : String[]= [];
-            try {
-              const response = await fetch('/api/digitalSigningLite', {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              });
-              
-              const apiRes = await response.json();
-              console.log(apiRes);
-              apiRes.data.data.ca_certificates.forEach((cert:string)=>{
-                arrayBuffer.push(atob(cert));
-              })
-            } catch (e) {
-              throw `Error ${e}`;
-            }
-            return [...arrayBuffer];
           }
         }).then(async function (inst: any) {
           trackInst = inst;
           setInstance(inst);
-
-          // **** Getting Digital Signature Info ****
-          const info = await inst.getSignaturesInfo();
-          if(info.status) digitallySigned = info;
-          // **** Setting Signature Validation Status ****
-          await inst.setViewState((viewState:any) => (
-             viewState.set("showSignatureValidationStatus", PSPDFKit.ShowSignatureValidationStatusMode.IF_SIGNED)
-          ));
 
           // **** Setting Page Index ****
 
@@ -556,7 +488,7 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
               event.preventDefault();
             }
           });
-          let formDesignMode = !1;
+          let formDesignMode = false;
 
           inst.setToolbarItems((items: any) => [
             ...items,
@@ -690,36 +622,40 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
 
   const applyDSign = async () => {
     setIsLoading(true);
-    //let res = {success: false, fileName: ""};
     try {
-      console.log("Start signing");
-      const doc = await instance.exportPDF();
-      console.log("PDF exported and sending for signing ", doc instanceof ArrayBuffer);
-      const pdfBlob = new Blob([doc], { type: "application/pdf" });
-      const imageBlob = await imageToBlob(`${window.location.protocol}//${window.location.host}/signed/logo.png`);
-      const formData = new FormData();
-      formData.append('file', pdfBlob);
-      formData.append('image', imageBlob);
-      //formData.append('graphicImage', imageBlob)
-      //res = await applyDigitalSignature(formData);
-      const res = await fetch('./api/digitalSigningLite', {
-        method:'POST',
-        body: formData
-      })
-      const container = containerRef.current; // This `useRef` instance will render the PDF.
-      if(container && res.ok){
-        const pdfBlob = await res.blob();
-        const newPdfUrl = URL.createObjectURL(pdfBlob);
-        // Load the new PDF into the viewer
-        setPdfUrl(newPdfUrl);
+      // get signing token from backend
+      const tokenResponse = await fetch('/api/digitalSigningLite', {
+        method: 'POST',
+      });
+      
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to get signing token');
       }
-      else{
-        alert("Error in signing");
-      }
-      console.log("Response from signing", res);
+      
+      const { accessToken } = await tokenResponse.json();
+
+      // Use the Web SDK's signDocument method with the token
+      await instance.signDocument(
+        {
+          signingData: {
+            signatureType: PSPDFKit.SignatureType.CAdES,
+            padesLevel: PSPDFKit.PAdESLevel.b_lt,
+            signatureMetadata: {
+              signerName: "Nutrient Sign App",
+              signatureReason: "Digital Signature using Nutrient's DWS API.",
+              signatureLocation: "Planet Earth"
+            }
+          }
+        },
+        {
+          jwt: accessToken
+        }
+      );
+
+      console.log("Document signed successfully");
     } catch (error) {
-      console.error('Error caught in catch block:', error);
-    } finally{
+      console.error('Error in signing process:', error);
+    } finally {
       setIsLoading(false);
     }
   }

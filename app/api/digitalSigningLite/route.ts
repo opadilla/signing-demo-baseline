@@ -2,66 +2,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from "axios";
 
+const DWS_API_BASE_URL = "https://api.nutrient.io";
+
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    formData.append('data', JSON.stringify({
-      signatureType: "cades",
-      flatten: true,
-      cadesLevel: "b-lt",
-      appearance : {
-        mode: "signatureAndDescription"
-      },
-      formFieldName: "DigitalSignature",
-      signatureMetadata:{
-        signerName: "Nutrient Sign App",
-        signatureReason: "Digital Signature using Nutrient's DWS API.",
-        signatureLocation: "Planet Earth"
-      },
-    }));
-
-    const apiToken = process.env.NEXT_PSPDFKIT_API_FREE;
-    const response = await axios.post('https://api.pspdfkit.com/sign', formData, {
-      headers: {
-        'Authorization': `Bearer ${apiToken}`,
-        'Content-Type': 'multipart/form-data'
-      },
-      responseType: 'arraybuffer'
-    });
-
-    return new NextResponse(response.data, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'attachment; filename="signed_document.pdf"'
-      }
-    });
-  } catch (error) {
-    console.error('Error in digital signing:', error);
-    return NextResponse.json({ error: 'Error in digital signing process' }, { status: 500 });
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const apiToken = process.env.NEXT_PSPDFKIT_API_FREE;
-    const response = await axios.get('https://api.pspdfkit.com/i/certificates', {
-      headers: {
-        'Authorization': `Bearer ${apiToken}`,
-      },
-    });
-
-
-    return NextResponse.json({
-      data : response.data
+    // instead of handling the PDF signing directly, generate a signing token that the client can use with the Web SDK
+    const response = await axios.post(`${DWS_API_BASE_URL}/tokens`, {
+      allowedOperations: ['digital_signatures_api'],
+      // update with actual allowed origins
+      allowedOrigins: [process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'],
+      expirationTime: 3600  // 1 hour
     }, {
-      status: 200,
       headers: {
+        'Authorization': `Bearer ${process.env.NEXT_NUTRIENT_API_KEY}`,
         'Content-Type': 'application/json'
       }
     });
+
+    return NextResponse.json({
+      accessToken: response.data.accessToken,
+      tokenId: response.data.id
+    }, { status: 200 });
+
   } catch (error) {
-    console.error('Error in fetching certificates:', error);
-    return NextResponse.json({ error: 'Error in fetching certificates' }, { status: 500 });
+    console.error('Error generating signing token:', error);
+    return NextResponse.json({ error: 'Error in token generation process' }, { status: 500 });
   }
 }
+
+// removed GET endpoint since certificate fetching is now handled by the Web SDK

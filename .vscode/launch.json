@@ -5,7 +5,10 @@
         "name": "Next.js: debug server-side",
         "type": "node-terminal",
         "request": "launch",
-        "command": "npm run dev"
+        "command": "npm run dev",
+        "env": {
+          "NEXT_PSPDFKIT_API_FREE": "62734eaf-3fbb-40eb-8923-d39f79570d49"
+        }
       },
       {
         "name": "Next.js: debug client-side",
