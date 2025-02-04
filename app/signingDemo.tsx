@@ -650,7 +650,7 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
       console.log("Document signed successfully");
     } catch (error) {
       console.error('Error in signing process:', error);
-      console.error('Full error:', error.stack);
+      // console.error('Full error:', error.stack);
     } finally {
       setIsLoading(false);
     }
@@ -660,6 +660,59 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
       <div className="spinner"></div>
     </div>
   );
+
+  const extractSignerDataFromAnnotations = async () => {
+    try {
+      const annotations = [];
+  
+      for (let i = 0; i < instance.totalPageCount; i++) {
+        const pageAnnotations = await instance.getAnnotations(i);
+        annotations.push(...pageAnnotations);
+      }
+  
+      console.log("All Annotations:", JSON.stringify(annotations, null, 2));
+  
+      // Extract text annotations with "name"
+      const nameAnnotations = annotations.filter(
+        (annotation) =>
+          annotation instanceof PSPDFKit.Annotations.TextAnnotation &&
+          annotation.customData?.type === "name"
+      );
+  
+      console.log("Name Annotations:", JSON.stringify(nameAnnotations, null, 2));
+  
+      // Extract signature annotations
+      const signatureAnnotations = annotations.filter(
+        (annotation) =>
+          annotation instanceof PSPDFKit.Annotations.WidgetAnnotation &&
+          annotation.customData?.type === "signature"
+      );
+  
+      console.log("Signature Annotations:", JSON.stringify(signatureAnnotations, null, 2));
+  
+      // Match names to signatures based on email
+      const signerData = signatureAnnotations.map((sig, index) => {
+        const matchingNameAnnotation = nameAnnotations.find(
+          (nameAnn) => nameAnn.customData.signerEmail === sig.customData.signerEmail
+        );
+  
+        return {
+          name: matchingNameAnnotation ? matchingNameAnnotation.text.value : "Unknown",
+          email: sig.customData.signerEmail || "Unknown",
+          date: sig.updatedAt || "Unknown",
+          annotationId: sig.id,
+        };
+      });
+  
+      console.log("Extracted Signer Data:", JSON.stringify(signerData, null, 2));
+  
+      if (signerData.length === 0) {
+        console.warn("No matching signers found.");
+      }
+    } catch (error) {
+      console.error("Error extracting annotations:", error);
+    }
+  };  
 
   const [selectedSignee, setSelectedSignee] = useState(currSigneeRef.current);
   return (
@@ -891,6 +944,13 @@ const SignDemo: React.FC<{ allUsers: User[]; user: User }> = ({
                   label={"Apply Digital Signature"}
                   size="md"
                   onPress={async function da(){await applyDSign()}}
+                  className="custom-button"
+                  style={{ margin: "15px 0px 0px 0px" }}
+                />
+                <ActionButton
+                  label={"Extract Signer Data"}
+                  size="md"
+                  onPress={extractSignerDataFromAnnotations}
                   className="custom-button"
                   style={{ margin: "15px 0px 0px 0px" }}
                 />

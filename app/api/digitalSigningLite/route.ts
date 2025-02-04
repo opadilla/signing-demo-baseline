@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('Error generating signing token:', error);
-    console.error('Error details:', error.response?.data);
-    console.error('Error status:', error.response?.status);
+    // console.error('Error details:', error.response?.data);
+    // console.error('Error status:', error.response?.status);
     return NextResponse.json({ error: 'Error in token generation process' }, { status: 500 });
   }
 }
